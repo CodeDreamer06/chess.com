@@ -6,6 +6,7 @@ import { useGameStore } from '@/store/useGameStore'
 import Square from '@/components/chess/Square'
 import { Square as ChessSquare, Piece } from 'chess.js'
 import { Socket } from 'socket.io-client'
+import { useEffect } from 'react'
 
 interface ChessBoardProps {
   socket: Socket | null;
@@ -103,6 +104,28 @@ export default function ChessBoard({ socket, roomId, playerColor }: ChessBoardPr
       }
     })
   }
+
+  // Effect to watch for game end state
+  useEffect(() => {
+    if (isCheckmate || isDraw) {
+      // Ensure we have necessary info and haven't already reported
+      if (socket && roomId && playerColor) { 
+        console.log(`Game over detected: Checkmate=${isCheckmate}, Draw=${isDraw}`);
+        
+        let result = "*"; // Default/Unknown
+        if (isCheckmate) {
+          result = turn === 'b' ? '1-0' : '0-1'; // White wins if black is checkmated, vice versa
+        } else if (isDraw) {
+          result = '1/2-1/2';
+        }
+
+        socket.emit('game_over', { roomId, result });
+        console.log('Emitted game_over event with result:', result);
+        // TODO: Maybe disable board interaction more formally here?
+      }
+    }
+    // Only trigger when game over state changes, or connection details change
+  }, [isCheckmate, isDraw, turn, socket, roomId, playerColor]); 
 
   return (
     <div className="flex flex-col items-center">

@@ -46,15 +46,15 @@ model User {
   email         String?   @unique
   emailVerified DateTime?
   image         String?
+  wins          Int       @default(0)
+  losses        Int       @default(0)
+  draws         Int       @default(0)
   accounts      Account[]
   sessions      Session[]
   
   // Chess specific fields
   rating        Int       @default(1200)
   gamesPlayed   Int       @default(0)
-  wins          Int       @default(0)
-  losses        Int       @default(0)
-  draws         Int       @default(0)
   
   // Relations
   gamesAsWhite  Game[]    @relation("WhitePlayer")

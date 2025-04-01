@@ -4,6 +4,8 @@ import dynamic from 'next/dynamic'
 import { useGameStore } from '@/store/useGameStore'
 import { useEffect, useState, useCallback } from 'react'
 import { io, Socket } from 'socket.io-client'
+import { useSession } from "next-auth/react"
+import { useRouter } from 'next/navigation'
 
 // Dynamically import ChessBoard as it likely uses browser APIs (like react-dnd)
 const ChessBoard = dynamic(() => import('@/components/chess/ChessBoard'), {
@@ -13,93 +15,110 @@ const ChessBoard = dynamic(() => import('@/components/chess/ChessBoard'), {
 let socketInstance: Socket | null = null; // Renamed to avoid conflict
 
 export default function PlayPage() {
+  const { data: session, status: sessionStatus } = useSession();
+  const router = useRouter();
   const { history, reset, applyOpponentMove } = useGameStore()
   const [isConnected, setIsConnected] = useState(false);
   const [roomId, setRoomId] = useState<string>('');
   const [inputRoomId, setInputRoomId] = useState<string>('');
   const [playerColor, setPlayerColor] = useState<'w' | 'b' | null>(null);
-  const [gameStatus, setGameStatus] = useState<string>('Enter a Room ID to join or create a game.');
+  const [gameStatus, setGameStatus] = useState<string>('Connecting...');
   const [isGameStarted, setIsGameStarted] = useState(false);
 
   const handleJoinRoom = useCallback(() => {
-    if (inputRoomId.trim() && socketInstance) {
-      console.log(`Attempting to join room: ${inputRoomId}`)
-      socketInstance.emit('join_room', inputRoomId.trim());
+    if (inputRoomId.trim() && socketInstance && session?.user?.id) {
+      console.log(`Attempting to join room: ${inputRoomId} as user: ${session.user.id}`)
+      socketInstance.emit('join_room', { roomId: inputRoomId.trim(), userId: session.user.id });
       setGameStatus(`Joining room ${inputRoomId}...`);
     }
-  }, [inputRoomId]);
+  }, [inputRoomId, session]);
+
+  useEffect(() => {
+    if (sessionStatus === "unauthenticated") {
+      router.push("/auth/signin?callbackUrl=/play");
+    }
+  }, [sessionStatus, router]);
 
   // Socket initialization and event listeners
   useEffect(() => {
-    socketInstance = io(window.location.origin, { path: "/socket.io" });
+    if (sessionStatus === "authenticated") {
+      socketInstance = io(window.location.origin, { path: "/socket.io" });
 
-    socketInstance.on('connect', () => {
-      console.log('🔌 Connected:', socketInstance?.id);
-      setIsConnected(true);
-    });
+      socketInstance.on('connect', () => {
+        console.log('🔌 Connected:', socketInstance?.id);
+        setIsConnected(true);
+      });
 
-    socketInstance.on('disconnect', (reason) => {
-      console.log('👋 Disconnected:', reason);
-      setIsConnected(false);
-      setGameStatus('Disconnected. Please refresh.');
-      setPlayerColor(null);
-      setIsGameStarted(false);
-      setRoomId('');
-    });
-
-    socketInstance.on('connect_error', (err) => {
-        console.error('Connection error:', err);
+      socketInstance.on('disconnect', (reason) => {
+        console.log('👋 Disconnected:', reason);
         setIsConnected(false);
-        setGameStatus('Connection failed. Please refresh.');
-    });
-
-    socketInstance.on('assign_color', (color: 'w' | 'b') => {
-      console.log(`Assigned color: ${color}`);
-      setPlayerColor(color);
-      setRoomId(inputRoomId.trim()); // Room joined successfully
-      setGameStatus(color === 'w' ? 'Waiting for opponent... (You are White)' : 'Joined as Black. Waiting for game to start...');
-    });
-
-    socketInstance.on('room_status', (message: string) => {
-        console.log('Room Status:', message);
-        setGameStatus(message);
-    });
-
-    socketInstance.on('game_start', (data: { roomId: string, players: Record<string, 'w' | 'b'>, message: string }) => {
-        console.log('Game Start:', data);
-        setGameStatus(data.message);
-        setIsGameStarted(true);
-        setPlayerColor(data.players[socketInstance?.id || ''] || null);
-        reset(); 
-    });
-
-    socketInstance.on('room_full', (message: string) => {
-        console.log('Room Full:', message);
-        setGameStatus(message + " Try a different Room ID.");
-    });
-
-    socketInstance.on('opponent_disconnected', (message: string) => {
-        console.log('Opponent Disconnected:', message);
-        setGameStatus(message + " Game over.");
+        setGameStatus('Disconnected. Please refresh.');
+        setPlayerColor(null);
         setIsGameStarted(false);
-    });
+        setRoomId('');
+      });
 
-    // --- Move Listener --- 
-    socketInstance.on('move_made', (moveData: { from: string, to: string, fen: string }) => {
-        console.log('Move received from server:', moveData);
-        // Apply the move using the FEN string for synchronization
-        applyOpponentMove(moveData.fen);
-    });
+      socketInstance.on('connect_error', (err) => {
+          console.error('Connection error:', err);
+          setIsConnected(false);
+          setGameStatus('Connection failed. Please refresh.');
+      });
 
-    return () => {
-      if(socketInstance) {
-        console.log("Disconnecting socket...")
-        socketInstance.disconnect();
-        socketInstance = null;
-        setIsConnected(false);
-      }
-    };
-  }, [inputRoomId, reset, applyOpponentMove]); 
+      socketInstance.on('assign_color', (color: 'w' | 'b') => {
+        console.log(`Assigned color: ${color}`);
+        setPlayerColor(color);
+        setRoomId(inputRoomId.trim()); // Room joined successfully
+        setGameStatus(color === 'w' ? 'Waiting for opponent... (You are White)' : 'Joined as Black. Waiting for game to start...');
+      });
+
+      socketInstance.on('room_status', (message: string) => {
+          console.log('Room Status:', message);
+          setGameStatus(message);
+      });
+
+      socketInstance.on('game_start', (data: { roomId: string, players: Record<string, 'w' | 'b'>, message: string }) => {
+          console.log('Game Start:', data);
+          setGameStatus(data.message);
+          setIsGameStarted(true);
+          setPlayerColor(data.players[socketInstance?.id || ''] || null);
+          reset(); 
+      });
+
+      socketInstance.on('room_full', (message: string) => {
+          console.log('Room Full:', message);
+          setGameStatus(message + " Try a different Room ID.");
+      });
+
+      socketInstance.on('opponent_disconnected', (message: string) => {
+          console.log('Opponent Disconnected:', message);
+          setGameStatus(message + " Game over.");
+          setIsGameStarted(false);
+      });
+
+      // --- Move Listener --- 
+      socketInstance.on('move_made', (moveData: { from: string, to: string, fen: string }) => {
+          console.log('Move received from server:', moveData);
+          // Apply the move using the FEN string for synchronization
+          applyOpponentMove(moveData.fen);
+      });
+
+      // Set initial game status after potential connection
+      setGameStatus('Enter a Room ID to join or create a game.')
+
+      return () => {
+        if(socketInstance) {
+          console.log("Disconnecting socket...")
+          socketInstance.disconnect();
+          socketInstance = null;
+          setIsConnected(false);
+        }
+      };
+    }
+  }, [sessionStatus, inputRoomId, reset, applyOpponentMove]); 
+
+  if (sessionStatus === "loading") {
+    return <p>Loading session...</p>;
+  }
 
   return (
     <div className="container mx-auto flex min-h-full flex-col items-center px-4 py-8">
@@ -111,7 +130,7 @@ export default function PlayPage() {
       </p>
       <p className="mb-4 text-lg font-medium text-gray-700 dark:text-gray-300">{gameStatus}</p>
       
-      {!isGameStarted && (
+      {sessionStatus === "authenticated" && !isGameStarted && (
         <div className="mb-4 flex items-center gap-2">
           <input 
             type="text" 
@@ -119,11 +138,11 @@ export default function PlayPage() {
             onChange={(e) => setInputRoomId(e.target.value)} 
             placeholder="Enter Room ID"
             className="rounded border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-            disabled={isConnected && !!roomId}
+            disabled={!isConnected || !!roomId}
           />
           <button 
             onClick={handleJoinRoom} 
-            disabled={!inputRoomId.trim() || !isConnected || !!roomId}
+            disabled={!inputRoomId.trim() || !isConnected || !!roomId || !session?.user?.id}
             className="rounded bg-blue-500 px-4 py-2 font-bold text-white hover:bg-blue-700 disabled:opacity-50"
           >
             Join / Create Room
@@ -131,8 +150,7 @@ export default function PlayPage() {
         </div>
       )}
 
-      {/* Game Area */} 
-      {(isGameStarted || roomId) && (
+      {sessionStatus === "authenticated" && (isGameStarted || roomId) && (
         <div className="flex w-full max-w-4xl flex-row justify-center gap-8">
           {/* Chess Board */} 
           <div className="w-auto">
