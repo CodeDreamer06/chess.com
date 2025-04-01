@@ -33,7 +33,7 @@ export default function ProfilePage() {
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch(`/api/users/${userId}/stats`);
+        const response = await fetch(`/api/stats/${userId}`);
         if (!response.ok) {
           const errorData = await response.json();
           throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
