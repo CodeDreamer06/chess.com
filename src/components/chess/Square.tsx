@@ -11,6 +11,7 @@ interface SquareProps {
   color: "light" | "dark"
   selected: boolean
   validMove: boolean
+  isInCheck: boolean
   onClick: () => void
   onDrop: (fromSquare: ChessSquare) => void
 }
@@ -20,7 +21,7 @@ interface DragItem {
   square: ChessSquare
 }
 
-export default function Square({ square, piece, color, selected, validMove, onClick, onDrop }: SquareProps) {
+export default function Square({ square, piece, color, selected, validMove, isInCheck, onClick, onDrop }: SquareProps) {
   const [{ isOver }, dropRef] = useDrop<DragItem, void, { isOver: boolean }>(() => ({
     accept: "piece",
     drop: (item: DragItem) => {
@@ -36,6 +37,7 @@ export default function Square({ square, piece, color, selected, validMove, onCl
     ${color === "light" ? "bg-amber-100" : "bg-amber-800"}
     ${selected ? "ring-2 ring-blue-500" : ""}
     ${validMove ? "ring-2 ring-green-500" : ""}
+    ${isInCheck ? "bg-red-400" : ""}
     ${isOver ? "ring-2 ring-yellow-500" : ""}
   `
 
@@ -45,4 +47,4 @@ export default function Square({ square, piece, color, selected, validMove, onCl
       {piece && <Piece piece={piece} square={square} />}
     </div>
   )
-} 
+}

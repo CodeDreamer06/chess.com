@@ -18,6 +18,7 @@ interface GameState {
   setSelectedSquare: (square: Square | null) => void
   setValidMoves: (moves: Square[]) => void
   makeMove: (from: Square, to: Square) => void
+  applyOpponentMove: (fen: string) => void
   reset: () => void
 }
 
@@ -49,7 +50,9 @@ export const useGameStore = create<GameState>((set, _get) => {
     
     makeMove: (from, to) => set((state) => {
       try {
-        state.game.move({ from, to })
+        const moveResult = state.game.move({ from, to })
+        if (!moveResult) throw new Error("Invalid move object from chess.js");
+        
         return {
           game: state.game,
           fen: state.game.fen(),
@@ -58,13 +61,31 @@ export const useGameStore = create<GameState>((set, _get) => {
           isCheckmate: state.game.isCheckmate(),
           isDraw: state.game.isDraw(),
           turn: state.game.turn() as 'w' | 'b',
-          moveFrom: null,
-          possibleMoves: [],
           selectedSquare: null,
           validMoves: [],
         }
       } catch (e) {
-        console.error('Invalid move:', e)
+        console.error('Invalid move attempted:', { from, to, error: e })
+        return state
+      }
+    }),
+
+    applyOpponentMove: (fen) => set((state) => {
+      try {
+        state.game.load(fen);
+        return {
+          game: state.game,
+          fen: state.game.fen(),
+          history: state.game.history(),
+          isCheck: state.game.isCheck(),
+          isCheckmate: state.game.isCheckmate(),
+          isDraw: state.game.isDraw(),
+          turn: state.game.turn() as 'w' | 'b',
+          selectedSquare: null,
+          validMoves: [],
+        }
+      } catch (e) {
+        console.error('Error loading FEN from opponent move:', { fen, error: e })
         return state
       }
     }),
