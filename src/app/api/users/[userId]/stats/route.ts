@@ -5,9 +5,9 @@ const prisma = new PrismaClient();
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  context: { params: { userId: string } }
 ) {
-  const userId = params.userId;
+  const userId = context.params.userId;
 
   if (!userId) {
     return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
