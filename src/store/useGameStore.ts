@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { Chess } from 'chess.js'
+import { Chess, Square } from 'chess.js'
 
 interface GameState {
   game: Chess
@@ -11,13 +11,17 @@ interface GameState {
   turn: 'w' | 'b'
   moveFrom: string | null
   possibleMoves: string[]
+  selectedSquare: Square | null
+  validMoves: Square[]
   setMoveFrom: (square: string | null) => void
   setPossibleMoves: (squares: string[]) => void
-  makeMove: (from: string, to: string, promotion?: string) => boolean
+  setSelectedSquare: (square: Square | null) => void
+  setValidMoves: (moves: Square[]) => void
+  makeMove: (from: Square, to: Square) => void
   reset: () => void
 }
 
-export const useGameStore = create<GameState>((set, get) => ({
+export const useGameStore = create<GameState>((set, _get) => ({
   game: new Chess(),
   fen: new Chess().fen(),
   history: [],
@@ -27,38 +31,38 @@ export const useGameStore = create<GameState>((set, get) => ({
   turn: 'w',
   moveFrom: null,
   possibleMoves: [],
+  selectedSquare: null,
+  validMoves: [],
 
   setMoveFrom: (square) => set({ moveFrom: square }),
   
   setPossibleMoves: (squares) => set({ possibleMoves: squares }),
   
-  makeMove: (from, to, promotion) => {
-    const { game } = get()
+  setSelectedSquare: (square) => set({ selectedSquare: square }),
+  
+  setValidMoves: (moves) => set({ validMoves: moves }),
+  
+  makeMove: (from, to) => set((state) => {
     try {
-      const move = game.move({
-        from,
-        to,
-        promotion,
-      })
-
-      if (move) {
-        set({
-          fen: game.fen(),
-          history: game.history(),
-          isCheck: game.isCheck(),
-          isCheckmate: game.isCheckmate(),
-          isDraw: game.isDraw(),
-          turn: game.turn() as 'w' | 'b',
-          moveFrom: null,
-          possibleMoves: [],
-        })
-        return true
+      state.game.move({ from, to })
+      return {
+        game: state.game,
+        fen: state.game.fen(),
+        history: state.game.history(),
+        isCheck: state.game.isCheck(),
+        isCheckmate: state.game.isCheckmate(),
+        isDraw: state.game.isDraw(),
+        turn: state.game.turn() as 'w' | 'b',
+        moveFrom: null,
+        possibleMoves: [],
+        selectedSquare: null,
+        validMoves: [],
       }
     } catch (e) {
       console.error('Invalid move:', e)
+      return state
     }
-    return false
-  },
+  }),
 
   reset: () => {
     const game = new Chess()
@@ -72,6 +76,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       turn: 'w',
       moveFrom: null,
       possibleMoves: [],
+      selectedSquare: null,
+      validMoves: [],
     })
   },
 })) 

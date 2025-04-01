@@ -3,81 +3,72 @@
 import { DndProvider } from 'react-dnd'
 import { HTML5Backend } from 'react-dnd-html5-backend'
 import { useGameStore } from '@/store/useGameStore'
-import Square from './Square'
-import Piece from './Piece'
-import { Move, Square as ChessSquare } from 'chess.js'
-
-const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
-const ranks = ['8', '7', '6', '5', '4', '3', '2', '1']
+import Square from '@/components/chess/Square'
+import { Square as ChessSquare } from 'chess.js'
 
 export default function ChessBoard() {
-  const { game, fen, moveFrom, possibleMoves, setMoveFrom, setPossibleMoves, makeMove } = useGameStore()
-
-  const calculateSquareColor = (file: string, rank: string) => {
-    const fileIndex = files.indexOf(file)
-    const rankIndex = ranks.indexOf(rank)
-    return (fileIndex + rankIndex) % 2 === 0 ? 'light' : 'dark'
-  }
+  const { game, selectedSquare, setSelectedSquare, validMoves, setValidMoves, makeMove } = useGameStore()
 
   const handleSquareClick = (square: ChessSquare) => {
     const piece = game.get(square)
 
-    if (moveFrom === null) {
-      if (piece) {
-        setMoveFrom(square)
-        const moves = game.moves({ square, verbose: true }) as Move[]
-        setPossibleMoves(moves.map(move => move.to))
+    if (!selectedSquare) {
+      if (piece && piece.color === game.turn()) {
+        setSelectedSquare(square)
+        const moves = game.moves({ square, verbose: true })
+        setValidMoves(moves.map(move => move.to))
       }
     } else {
-      if (possibleMoves.includes(square)) {
-        makeMove(moveFrom, square)
-      } else if (square === moveFrom) {
-        setMoveFrom(null)
-        setPossibleMoves([])
+      if (validMoves.includes(square)) {
+        makeMove(selectedSquare, square)
+        setSelectedSquare(null)
+        setValidMoves([])
       } else if (piece && piece.color === game.turn()) {
-        setMoveFrom(square)
-        const moves = game.moves({ square, verbose: true }) as Move[]
-        setPossibleMoves(moves.map(move => move.to))
+        setSelectedSquare(square)
+        const moves = game.moves({ square, verbose: true })
+        setValidMoves(moves.map(move => move.to))
       } else {
-        setMoveFrom(null)
-        setPossibleMoves([])
+        setSelectedSquare(null)
+        setValidMoves([])
       }
     }
   }
 
+  const handleDrop = (fromSquare: ChessSquare, toSquare: ChessSquare) => {
+    makeMove(fromSquare, toSquare)
+    setSelectedSquare(null)
+    setValidMoves([])
+  }
+
+  const board = Array(8).fill(null).map((_, i) => 
+    Array(8).fill(null).map((_, j) => {
+      const square = `${String.fromCharCode(97 + j)}${8 - i}` as ChessSquare
+      const piece = game.get(square)
+      return piece || null
+    })
+  )
+
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="aspect-square w-full max-w-2xl border border-gray-200 dark:border-gray-700">
-        <div className="grid h-full w-full grid-cols-8 grid-rows-8">
-          {ranks.map((rank) =>
-            files.map((file) => {
-              const square = `${file}${rank}` as ChessSquare
-              const piece = game.get(square)
-              const squareColor = calculateSquareColor(file, rank)
-              const isSelected = square === moveFrom
-              const isValidMove = possibleMoves.includes(square)
-
-              return (
-                <Square
-                  key={square}
-                  square={square}
-                  color={squareColor}
-                  selected={isSelected}
-                  validMove={isValidMove}
-                  onClick={() => handleSquareClick(square)}
-                >
-                  {piece && (
-                    <Piece
-                      type={piece.type}
-                      color={piece.color}
-                      square={square}
-                    />
-                  )}
-                </Square>
-              )
-            })
-          )}
-        </div>
+      <div className="grid grid-cols-8 w-[640px] h-[640px] border-2 border-gray-800">
+        {board.map((row, i) =>
+          row.map((piece, j) => {
+            const isLight = (i + j) % 2 === 0
+            const square = `${String.fromCharCode(97 + j)}${8 - i}` as ChessSquare
+            return (
+              <Square 
+                key={`${i}-${j}`}
+                square={square}
+                piece={piece}
+                color={isLight ? "light" : "dark"}
+                selected={square === selectedSquare}
+                validMove={validMoves.includes(square)}
+                onClick={() => handleSquareClick(square)}
+                onDrop={(fromSquare) => handleDrop(fromSquare, square)}
+              />
+            )
+          })
+        )}
       </div>
     </DndProvider>
   )

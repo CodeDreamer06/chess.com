@@ -1,12 +1,11 @@
 'use client'
 
-import { useDrag } from 'react-dnd'
-import { useGameStore } from '@/store/useGameStore'
-import { Square as ChessSquare, Move } from 'chess.js'
+import { useDrag } from "react-dnd"
+import { Square as ChessSquare, Piece as ChessPiece } from "chess.js"
+import { DragSourceMonitor } from "react-dnd"
 
 interface PieceProps {
-  type: 'p' | 'n' | 'b' | 'r' | 'q' | 'k'
-  color: 'w' | 'b'
+  piece: ChessPiece
   square: ChessSquare
 }
 
@@ -15,54 +14,39 @@ interface DragItem {
   square: ChessSquare
 }
 
-const pieceSymbols = {
-  w: {
-    k: '♔',
-    q: '♕',
-    r: '♖',
-    b: '♗',
-    n: '♘',
-    p: '♙',
-  },
-  b: {
-    k: '♚',
-    q: '♛',
-    r: '♜',
-    b: '♝',
-    n: '♞',
-    p: '♟',
-  },
-} as const
-
-export default function Piece({ type, color, square }: PieceProps) {
-  const { game, setMoveFrom, setPossibleMoves } = useGameStore()
-
-  const [{ isDragging }, drag] = useDrag<DragItem, void, { isDragging: boolean }>(() => ({
-    type: 'piece',
-    item: { type: 'piece', square },
-    canDrag: () => game.turn() === color,
-    collect: (monitor) => ({
+export default function Piece({ piece, square }: PieceProps) {
+  const [{ isDragging }, dragRef] = useDrag<DragItem, void, { isDragging: boolean }>(() => ({
+    type: "piece",
+    item: { type: "piece", square },
+    collect: (monitor: DragSourceMonitor<DragItem>) => ({
       isDragging: !!monitor.isDragging(),
     }),
-  }), [square, color, game.turn()])
+  }), [square])
 
-  const handleMouseDown = () => {
-    if (game.turn() === color) {
-      setMoveFrom(square)
-      const moves = game.moves({ square, verbose: true }) as Move[]
-      setPossibleMoves(moves.map(move => move.to))
+  const pieceClass = `
+    absolute inset-0
+    flex items-center justify-center
+    text-4xl cursor-move
+    ${piece.color === "w" ? "text-white" : "text-black"}
+    ${isDragging ? "opacity-50" : ""}
+  `
+
+  const getPieceSymbol = (piece: ChessPiece) => {
+    const symbols: Record<string, string> = {
+      p: "♟",
+      n: "♞",
+      b: "♝",
+      r: "♜",
+      q: "♛",
+      k: "♚",
     }
+    return symbols[piece.type]
   }
 
   return (
-    <div
-      ref={drag}
-      className={`cursor-grab select-none text-4xl ${
-        color === 'w' ? 'text-white' : 'text-black'
-      } ${isDragging ? 'opacity-50' : ''}`}
-      onMouseDown={handleMouseDown}
-    >
-      {pieceSymbols[color][type]}
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    <div ref={dragRef as any} className={pieceClass}>
+      {getPieceSymbol(piece)}
     </div>
   )
 } 

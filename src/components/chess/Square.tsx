@@ -1,16 +1,18 @@
 'use client'
 
-import { useDrop } from 'react-dnd'
-import { useGameStore } from '@/store/useGameStore'
-import { Square as ChessSquare } from 'chess.js'
+import { useDrop } from "react-dnd"
+import { Square as ChessSquare, Piece as ChessPiece } from "chess.js"
+import Piece from "./Piece"
+import { DropTargetMonitor } from "react-dnd"
 
 interface SquareProps {
   square: ChessSquare
-  color: 'light' | 'dark'
+  piece: ChessPiece | null
+  color: "light" | "dark"
   selected: boolean
   validMove: boolean
-  children?: React.ReactNode
   onClick: () => void
+  onDrop: (fromSquare: ChessSquare) => void
 }
 
 interface DragItem {
@@ -18,34 +20,29 @@ interface DragItem {
   square: ChessSquare
 }
 
-export default function Square({ square, color, selected, validMove, children, onClick }: SquareProps) {
-  const { makeMove } = useGameStore()
-
-  const [{ isOver }, drop] = useDrop<DragItem, void, { isOver: boolean }>(() => ({
-    accept: 'piece',
-    drop: (item) => {
-      makeMove(item.square, square)
+export default function Square({ square, piece, color, selected, validMove, onClick, onDrop }: SquareProps) {
+  const [{ isOver }, dropRef] = useDrop<DragItem, void, { isOver: boolean }>(() => ({
+    accept: "piece",
+    drop: (item: DragItem) => {
+      onDrop(item.square)
     },
-    collect: (monitor) => ({
+    collect: (monitor: DropTargetMonitor<DragItem>) => ({
       isOver: !!monitor.isOver(),
     }),
-  }), [square, makeMove])
+  }), [square, onDrop])
+
+  const squareClass = `
+    w-full h-full relative
+    ${color === "light" ? "bg-amber-100" : "bg-amber-800"}
+    ${selected ? "ring-2 ring-blue-500" : ""}
+    ${validMove ? "ring-2 ring-green-500" : ""}
+    ${isOver ? "ring-2 ring-yellow-500" : ""}
+  `
 
   return (
-    <div
-      ref={drop}
-      className={`relative flex h-full w-full items-center justify-center ${
-        color === 'light'
-          ? 'bg-amber-50 dark:bg-amber-900'
-          : 'bg-amber-600 dark:bg-amber-800'
-      } ${selected ? 'ring-2 ring-blue-500 ring-inset' : ''} ${
-        validMove
-          ? 'after:absolute after:h-3 after:w-3 after:rounded-full after:bg-blue-500/50'
-          : ''
-      } ${isOver ? 'bg-blue-200 dark:bg-blue-900' : ''}`}
-      onClick={onClick}
-    >
-      {children}
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    <div ref={dropRef as any} className={squareClass} onClick={onClick}>
+      {piece && <Piece piece={piece} square={square} />}
     </div>
   )
 } 
