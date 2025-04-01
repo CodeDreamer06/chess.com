@@ -40,9 +40,15 @@ export default function ProfilePage() {
         }
         const data: UserProfile = await response.json();
         setProfile(data);
-      } catch (e: any) {
+      } catch (e: unknown) {
         console.error("Failed to fetch profile:", e);
-        setError(e.message || 'Failed to load profile.');
+        let errorMessage = 'Failed to load profile.';
+        if (e instanceof Error) {
+          errorMessage = e.message;
+        } else if (typeof e === 'string') {
+          errorMessage = e;
+        }
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }
