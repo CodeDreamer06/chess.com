@@ -1,0 +1,106 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type             String
+  provider         String
+  providerAccountId String
+  refresh_token    String? @db.Text
+  access_token     String? @db.Text
+  expires_at       Int?
+  token_type       String?
+  scope            String?
+  id_token         String? @db.Text
+  session_state    String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+  
+  // Chess specific fields
+  rating        Int       @default(1200)
+  gamesPlayed   Int       @default(0)
+  wins          Int       @default(0)
+  losses        Int       @default(0)
+  draws         Int       @default(0)
+  
+  // Relations
+  gamesAsWhite  Game[]    @relation("WhitePlayer")
+  gamesAsBlack  Game[]    @relation("BlackPlayer")
+  puzzlesSolved Puzzle[]
+}
+
+model Game {
+  id          String    @id @default(cuid())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  whiteId     String
+  blackId     String
+  whitePlayer User      @relation("WhitePlayer", fields: [whiteId], references: [id])
+  blackPlayer User      @relation("BlackPlayer", fields: [blackId], references: [id])
+  
+  result      String?   // "1-0", "0-1", "1/2-1/2"
+  pgn         String    @db.Text
+  timeControl String    // e.g., "5+3", "3+2", "15+10"
+  rated       Boolean   @default(true)
+  status      String    @default("active") // "active", "completed", "aborted"
+  
+  moves       Move[]
+}
+
+model Move {
+  id        String   @id @default(cuid())
+  gameId    String
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  
+  moveNumber Int
+  move      String   // e.g., "e4", "Nf6"
+  fen       String   // Position after move
+  timestamp DateTime @default(now())
+  
+  @@unique([gameId, moveNumber])
+}
+
+model Puzzle {
+  id          String   @id @default(cuid())
+  fen         String   // Starting position
+  moves       String[] // Sequence of correct moves
+  rating      Int      @default(1500)
+  theme       String   // e.g., "fork", "pin", "mate in 2"
+  
+  // Users who solved this puzzle
+  solvedBy    User[]
+}
